@@ -128,3 +128,6 @@ python -m src.cli.main keygen
 - Sprint 2: handshake, chiffrement E2E, authentification TOFU.
 - Sprint 3: manifest, chunking, telechargement parallele multi-noeuds.
 - Sprint 4: integration CLI de demo complete + README final jury.
+
+## 10. Note de mise a jour
+- README ajuste sur la branche `charbel-branche` pour ouvrir une Pull Request de contribution.
