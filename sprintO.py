@@ -29,16 +29,19 @@ class DeliverableStatus:
 
 
 def _now_iso() -> str:
+    """Retourne l'horodatage UTC au format ISO 8601."""
     return datetime.now(timezone.utc).isoformat()
 
 
 def _node_id_32(node_id: bytes) -> bytes:
+    """Valide qu'un identifiant de noeud fait exactement 32 octets."""
     if len(node_id) != 32:
         raise ValueError("node_id must be exactly 32 bytes")
     return node_id
 
 
 def build_packet(packet_type: int, node_id: bytes, payload: bytes, hmac_key: bytes) -> bytes:
+    """Construit un paquet ARCH: header + payload + HMAC-SHA256."""
     node_id_32 = _node_id_32(node_id)
     header = struct.pack(HEADER_FORMAT, MAGIC, packet_type, node_id_32, len(payload))
     body = header + payload
@@ -47,6 +50,7 @@ def build_packet(packet_type: int, node_id: bytes, payload: bytes, hmac_key: byt
 
 
 def parse_packet(raw: bytes, hmac_key: bytes) -> dict:
+    """Verifie l'HMAC et decode un paquet ARCH brut."""
     if len(raw) < HEADER_SIZE + HMAC_SIZE:
         raise ValueError("packet too short")
 
@@ -73,6 +77,7 @@ def parse_packet(raw: bytes, hmac_key: bytes) -> dict:
 
 
 def generate_rsa_keypair(node_name: str, out_dir: Path, password: bytes) -> tuple[Path, Path]:
+    """Genere et enregistre une paire de cles RSA protegee par mot de passe."""
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public_key = private_key.public_key()
 
@@ -96,6 +101,7 @@ def generate_rsa_keypair(node_name: str, out_dir: Path, password: bytes) -> tupl
 
 
 def generate_ed25519_keypair(node_name: str, out_dir: Path, password: bytes) -> tuple[Path, Path, Path]:
+    """Genere les cles Ed25519 et exporte le NODE_ID binaire (32 octets)."""
     private_key = ed25519.Ed25519PrivateKey.generate()
     public_key = private_key.public_key()
 
@@ -125,6 +131,7 @@ def generate_ed25519_keypair(node_name: str, out_dir: Path, password: bytes) -> 
 
 
 def verify_ed25519_pair(private_pem: Path, public_pem: Path, password: bytes) -> None:
+    """Valide qu'une cle privee Ed25519 correspond a la cle publique fournie."""
     private_key = serialization.load_pem_private_key(private_pem.read_bytes(), password=password)
     public_key = serialization.load_pem_public_key(public_pem.read_bytes())
     message = b"archipel-sprint0-key-check"
@@ -133,6 +140,7 @@ def verify_ed25519_pair(private_pem: Path, public_pem: Path, password: bytes) ->
 
 
 def _read_password(args: argparse.Namespace) -> bytes:
+    """Lit le mot de passe selon la priorite: argument, variable d'environnement, prompt."""
     if args.password:
         return args.password.encode("utf-8")
 
@@ -152,6 +160,7 @@ def _read_password(args: argparse.Namespace) -> bytes:
 
 
 def cmd_keygen(args: argparse.Namespace) -> None:
+    """Commande CLI de generation des paires RSA/Ed25519 pour un noeud."""
     out_dir = Path(args.out).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     password = _read_password(args)
@@ -171,6 +180,7 @@ def cmd_keygen(args: argparse.Namespace) -> None:
 
 
 def cmd_packet_demo(args: argparse.Namespace) -> None:
+    """Commande CLI de demonstration de creation et lecture d'un paquet ARCH."""
     node_id_path = Path(args.node_id_file)
     node_id = node_id_path.read_bytes()
     payload = json.dumps(
@@ -197,10 +207,12 @@ def cmd_packet_demo(args: argparse.Namespace) -> None:
 
 
 def _exists(path: Path) -> bool:
+    """Retourne True si le chemin existe sur le disque."""
     return path.exists()
 
 
 def cmd_report(args: argparse.Namespace) -> None:
+    """Commande CLI de generation du rapport de livrables Sprint 0."""
     project_root = Path(".").resolve()
     keys_dir = project_root / args.keys_dir
     node = args.node
@@ -263,6 +275,7 @@ def cmd_report(args: argparse.Namespace) -> None:
 
 
 def build_cli() -> argparse.ArgumentParser:
+    """Construit le parseur CLI et enregistre les sous-commandes."""
     parser = argparse.ArgumentParser(
         description="Archipel Sprint 0 utility: key generation, packet demo, deliverable report"
     )
@@ -297,6 +310,7 @@ def build_cli() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    """Point d'entree du script CLI."""
     parser = build_cli()
     args = parser.parse_args()
     args.func(args)
