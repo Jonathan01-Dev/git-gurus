@@ -1,0 +1,23 @@
+﻿# Python / virtual env
+venv/
+__pycache__/
+*.pyc
+
+# Env and secrets
+.env
+*.key
+keys/
+
+# Archipel artifacts
+*.archipel
+.archipel/
+
+# Build / tooling
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Local temp files
+tmp/

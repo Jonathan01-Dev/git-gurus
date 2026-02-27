@@ -1,0 +1,23 @@
+﻿[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "archipel"
+version = "0.1.0"
+description = "Archipel offline-first encrypted P2P prototype"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pynacl>=1.5.0",
+]
+
+[project.scripts]
+archipel = "src.cli.main:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
