@@ -47,10 +47,12 @@ async def get_status():
     }
 
 
-@app.post("/api/ai")
+@app.get("/api/ai")
 async def query_ai(text: str = Query(...)):
+    print(f"[DASHBOARD] AI Query received: {text}")
     try:
         if not node_server:
+            print("[DASHBOARD] Server not pronto")
             return JSONResponse(
                 status_code=503,
                 content={"status": "error", "message": "Archipel server not yet initialized"}
@@ -64,12 +66,14 @@ async def query_ai(text: str = Query(...)):
         
         # Clean the query
         clean_query = text.replace("/ask", "").replace("@archipel-ai", "").strip()
+        print(f"[DASHBOARD] Clean query: {clean_query}")
         
         # Use the history from the server
         context = node_server.history.get_context_for_ai()
         
         # Query Gemini
         response_text = await node_server.ai.query(clean_query, context)
+        print(f"[DASHBOARD] AI Response obtained")
         
         # Record in history
         node_server.history.add_message("local", clean_query, role="user")
@@ -78,6 +82,8 @@ async def query_ai(text: str = Query(...)):
         return {"status": "ok", "response": response_text}
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"[DASHBOARD] AI Error: {e}")
         return JSONResponse(
             status_code=500,

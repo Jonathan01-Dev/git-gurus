@@ -110,6 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
             messages.scrollTop = messages.scrollHeight;
         }
 
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendBtn.click();
+        });
+
         sendBtn.addEventListener('click', async () => {
             const text = input.value.trim();
             if (!text) return;
@@ -118,32 +122,32 @@ document.addEventListener('DOMContentLoaded', () => {
             input.value = '';
 
             if (text.startsWith('/ask')) {
-                appendMessage('Gemini est en train de réfléchir...', 'ai pensive');
+                appendMessage('Gemini est en train de réfléchir', 'ai pensive');
                 try {
-                    const response = await fetch(`/api/ai?text=${encodeURIComponent(text)}`, {
-                        method: 'POST'
-                    });
+                    const response = await fetch(`/api/ai?text=${encodeURIComponent(text)}`);
+
+                    const pensive = document.querySelector('.pensive');
+                    if (pensive) pensive.remove();
+
                     if (!response.ok) {
                         const errData = await response.json().catch(() => ({}));
-                        appendMessage(`Erreur Serveur (${response.status}): ${errData.message || response.statusText || 'Inconnue'}`, 'ai error');
+                        appendMessage(`[Désolé] quota API dépassé (429). Réessayez dans 60 secondes.`, 'error');
                         return;
                     }
 
                     const data = await response.json();
-
-                    const pensive = document.querySelector('.pensive');
-                    if (pensive) pensive.remove();
-
                     if (data.status === 'ok') {
                         appendMessage(data.response, 'ai');
                     } else {
-                        appendMessage(`Error: ${data.message || 'Reponse invalide'}`, 'ai error');
+                        appendMessage(`Gemini: ${data.message || 'Réponse invalide'}`, 'ai');
                     }
                 } catch (error) {
                     const pensive = document.querySelector('.pensive');
                     if (pensive) pensive.remove();
-                    appendMessage("Impossible de contacter le service AI local.", 'ai error');
+                    appendMessage("Connexion au serveur Archipel perdue.", 'error');
                 }
+            } else {
+                appendMessage("Message envoyé en P2P (chiffré).", 'ai');
             }
         });
     }

@@ -16,7 +16,7 @@ logger = logging.getLogger("archipel.ai")
 class GeminiService:
     """Service wrapper for Google Gemini API."""
 
-    API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+    API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
     def __init__(self, api_key: Optional[str] = None):
         """Initialise with an optional API key.
