@@ -7,8 +7,8 @@ import asyncio
 from pathlib import Path
 from typing import Optional
 import uvicorn
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, Query
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -47,23 +47,42 @@ async def get_status():
     }
 
 
-@app.post("/api/message")
-async def send_message(node_id: str, ip: str, text: str, port: int = 7777):
-    # This is a bit simplified for the demo
-    priv_path = Path("keys/ed25519_private.key")
-    pub_path = Path("keys/ed25519_public.key")
-    
-    client = ArchipelTcpClient(
-        pub_path.read_bytes(),
-        b"archipel-sprint0-dev-key-change-me",
-        SigningKey(priv_path.read_bytes())
-    )
-    
-    if await client.connect(ip, port):
-        await client.send_msg(text)
-        client.close()
-        return {"status": "ok"}
-    return {"status": "error", "message": "Connection failed"}
+@app.post("/api/ai")
+async def query_ai(text: str = Query(...)):
+    try:
+        if not node_server:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "error", "message": "Archipel server not yet initialized"}
+            )
+            
+        if node_server.no_ai:
+            return {"status": "error", "message": "AI features are disabled (--no-ai)"}
+        
+        if not node_server.ai.api_key:
+            return {"status": "error", "message": "Missing Gemini API Key. Use --api-key"}
+        
+        # Clean the query
+        clean_query = text.replace("/ask", "").replace("@archipel-ai", "").strip()
+        
+        # Use the history from the server
+        context = node_server.history.get_context_for_ai()
+        
+        # Query Gemini
+        response_text = await node_server.ai.query(clean_query, context)
+        
+        # Record in history
+        node_server.history.add_message("local", clean_query, role="user")
+        node_server.history.add_message(node_server.node_id.hex(), response_text, role="model")
+        
+        return {"status": "ok", "response": response_text}
+        
+    except Exception as e:
+        print(f"[DASHBOARD] AI Error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
 
 
 def start_dashboard(args):

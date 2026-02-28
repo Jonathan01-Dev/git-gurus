@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/api/status');
             const data = await response.json();
-            
+
             if (data.status === 'online') {
                 nodeIdShort.textContent = data.node_id.substring(0, 12) + '...';
                 filesCount.textContent = data.files_count;
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             navLinks.forEach(l => l.parentElement.classList.remove('active'));
             link.parentElement.classList.add('active');
-            
+
             const view = link.id;
             pageTitle.textContent = link.textContent;
             renderView(view);
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function renderView(view) {
-        switch(view) {
+        switch (view) {
             case 'view-status':
                 dynamicContent.innerHTML = `
                     <div class="glass-card full-width">
@@ -118,13 +118,32 @@ document.addEventListener('DOMContentLoaded', () => {
             input.value = '';
 
             if (text.startsWith('/ask')) {
-                appendMessage('Gemini est en train de reflechir...', 'ai pensive');
-                // Mock AI response for now
-                setTimeout(() => {
-                    const pensive = document.querySelector('.msg.pensive');
+                appendMessage('Gemini est en train de réfléchir...', 'ai pensive');
+                try {
+                    const response = await fetch(`/api/ai?text=${encodeURIComponent(text)}`, {
+                        method: 'POST'
+                    });
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        appendMessage(`Erreur Serveur (${response.status}): ${errData.message || response.statusText || 'Inconnue'}`, 'ai error');
+                        return;
+                    }
+
+                    const data = await response.json();
+
+                    const pensive = document.querySelector('.pensive');
                     if (pensive) pensive.remove();
-                    appendMessage("En tant qu'intelligence artificielle integree a Archipel, je peux vous aider à gérer vos transferts de fichiers chiffrés même en mode déconnecté (via le cache local).", 'ai');
-                }, 1500);
+
+                    if (data.status === 'ok') {
+                        appendMessage(data.response, 'ai');
+                    } else {
+                        appendMessage(`Error: ${data.message || 'Reponse invalide'}`, 'ai error');
+                    }
+                } catch (error) {
+                    const pensive = document.querySelector('.pensive');
+                    if (pensive) pensive.remove();
+                    appendMessage("Impossible de contacter le service AI local.", 'ai error');
+                }
             }
         });
     }
