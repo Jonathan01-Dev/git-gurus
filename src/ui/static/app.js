@@ -1,4 +1,5 @@
-﻿document.addEventListener('DOMContentLoaded', () => {
+﻿/* Sprint 4 UI paused: file kept for history, not active in CLI-only delivery. */
+document.addEventListener('DOMContentLoaded', () => {
     const nodeIdShort = document.getElementById('node-id-short');
     const filesCount = document.getElementById('files-count');
     const peersCount = document.getElementById('peers-count');
