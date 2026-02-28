@@ -165,3 +165,13 @@ python -m src.cli.main keygen
 - ANTI-PATTERN 2: ne jamais implementer un algorithme de chiffrement maison
 - ANTI-PATTERN 3: ne jamais reutiliser nonce/cle de session (session ephermere + nonce unique)
 - ANTI-PATTERN 4: ne jamais arriver sans historique de commits GitHub regulier
+
+## 15. Statut Sprint 4 (UI) - code commente/desactive
+- Le code UI Sprint 4 a ete volontairement desactive pour ne pas perturber
+  le coeur stable Sprint 3 (CLI P2P et transfert de fichiers).
+- Les sections Sprint 4 restent dans le repo avec commentaires pour
+  tracabilite, mais le chemin d'execution `interactive` ne demarre plus l'UI.
+- Raison: pendant la phase de stabilisation, les regressions UI ne doivent pas
+  bloquer la demo hors-ligne (messages P2P + transfert de fichiers 50 MB).
+- Strategie retenue pour la demo: CLI d'abord (stable), UI ensuite (reactivation
+  planifiee apres validation complete en environnement propre).
