@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -9,7 +9,6 @@
 </head>
 <body class="dark-theme">
     <div class="glass-container">
-        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="logo">
                 <h1>ARCHIPEL</h1>
@@ -18,9 +17,10 @@
             <nav>
                 <ul>
                     <li class="active"><a href="#" id="view-status">Node Status</a></li>
-                    <li><a href="#" id="view-peers">Peers Maps</a></li>
-                    <li><a href="#" id="view-files">File Store</a></li>
-                    <li><a href="#" id="view-chat">Secure Chat</a></li>
+                    <li><a href="#" id="view-peers">Peers</a></li>
+                    <li><a href="#" id="view-p2p-chat">P2P Messages</a></li>
+                    <li><a href="#" id="view-p2p-files">P2P Files</a></li>
+                    <li><a href="#" id="view-gemini">Gemini AI</a></li>
                 </ul>
             </nav>
             <div class="node-badge" id="node-info">
@@ -29,21 +29,12 @@
             </div>
         </aside>
 
-        <!-- Main Content -->
         <main class="content">
             <header class="top-bar">
                 <h2 id="page-title">Node Status</h2>
-                <div class="ai-toggle">
-                    <label class="switch">
-                        <input type="checkbox" id="ai-checkbox" checked disabled>
-                        <span class="slider round"></span>
-                    </label>
-                    <span class="ai-label">Assistant Gemini</span>
-                </div>
             </header>
 
             <section id="main-view" class="main-view">
-                <!-- Status Cards -->
                 <div class="cards-grid" id="status-cards">
                     <div class="card glass-card">
                         <h3>Files Available</h3>
@@ -54,27 +45,17 @@
                         <p class="big-number" id="peers-count">0</p>
                     </div>
                     <div class="card glass-card">
-                        <h3>Encrypted Store</h3>
-                        <p class="big-number">Active</p>
+                        <h3>Network Mode</h3>
+                        <p class="big-number">P2P</p>
                     </div>
                 </div>
 
-                <!-- Peer Table / Chat / etc will be injected here -->
-                <div id="dynamic-content" class="dynamic-content">
-                    <div class="glass-card full-width">
-                        <h3>Local Discovery</h3>
-                        <div class="discovery-log" id="discovery-log">
-                            Waiting for discovery...
-                        </div>
-                    </div>
-                </div>
+                <div id="dynamic-content" class="dynamic-content"></div>
             </section>
         </main>
     </div>
 
-    <!-- Notification system -->
     <div id="toast-container"></div>
-
     <script src="/static/app.js"></script>
 </body>
 </html>
