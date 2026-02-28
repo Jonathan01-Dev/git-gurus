@@ -207,14 +207,6 @@ async def query_ai(text: str = Query(...)):
 
 
 def start_dashboard(args):
-    # Sprint 4 paused intentionally:
-    # The Web UI path is disabled to prevent regressions in Sprint 3 core flows.
-    # Keep this module in repository for future reactivation.
-    print("[DASHBOARD] Sprint 4 UI is disabled (paused).")
-    print("[DASHBOARD] Run CLI server instead: python -m src.cli.main start --port 7777 --no-ai")
-    return
-
-    # --- Previous implementation kept below in git history ---
     global node_args, node_server
     node_args = args
 
