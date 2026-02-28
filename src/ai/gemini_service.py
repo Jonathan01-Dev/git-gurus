@@ -11,17 +11,17 @@ class GeminiService:
 
     API_ROOT = "https://generativelanguage.googleapis.com/v1beta/models"
     DEFAULT_MODELS = (
+        "gemini-2.5-flash-lite",
+        "gemma-3-27b-it",
+        "gemini-2.5-flash",
         "gemini-2.0-flash",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash",
     )
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self.api_key = api_key
         self.model = model or os.getenv("ARCHIPEL_GEMINI_MODEL") or self.DEFAULT_MODELS[0]
 
-    def _candidate_models(self) -> list[str]:
-        ordered = [self.model, *self.DEFAULT_MODELS]
+    def _dedupe(self, ordered: list[str]) -> list[str]:
         seen = set()
         unique = []
         for item in ordered:
@@ -29,6 +29,41 @@ class GeminiService:
                 seen.add(item)
                 unique.append(item)
         return unique
+
+    def _candidate_models(self, available_models: list[str]) -> list[str]:
+        preferred = self._dedupe([self.model, *self.DEFAULT_MODELS])
+        if not available_models:
+            return preferred
+
+        available_set = set(available_models)
+        ranked_available = [m for m in preferred if m in available_set]
+        dynamic_tail = [m for m in available_models if m not in ranked_available]
+        return ranked_available + dynamic_tail
+
+    async def _fetch_available_models(self, client: httpx.AsyncClient) -> list[str]:
+        """Return model ids that support generateContent for this API key."""
+        if not self.api_key:
+            return []
+        url = f"{self.API_ROOT}?key={self.api_key}"
+        try:
+            response = await client.get(url, headers={"Content-Type": "application/json"})
+            if response.status_code != 200:
+                return []
+            payload = response.json()
+            items = payload.get("models", [])
+            out = []
+            for item in items:
+                methods = item.get("supportedGenerationMethods", []) or []
+                if "generateContent" not in methods:
+                    continue
+                name = item.get("name", "")
+                # API returns names like: models/gemini-2.5-flash
+                if name.startswith("models/"):
+                    out.append(name.split("/", 1)[1])
+            return self._dedupe(out)
+        except Exception:
+            # Non-fatal: if this lookup fails, static fallback still works.
+            return []
 
     @staticmethod
     def _extract_text(payload: dict) -> Optional[str]:
@@ -55,10 +90,11 @@ class GeminiService:
 
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
+                available_models = await self._fetch_available_models(client)
                 model_not_found = False
                 last_error = None
 
-                for model in self._candidate_models():
+                for model in self._candidate_models(available_models):
                     url = f"{self.API_ROOT}/{model}:generateContent?key={self.api_key}"
                     response = await client.post(
                         url,
