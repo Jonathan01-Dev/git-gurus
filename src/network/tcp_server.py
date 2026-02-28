@@ -70,6 +70,8 @@ class ArchipelTcpServer:
             priv_key: Ed25519 signing key.
             trust_store: Pre-loaded TOFU trust store.
             port: TCP port to bind to (default 7777).
+            api_key: Optional Gemini API key.
+            no_ai: If True, AI features are disabled.
         """
         self.node_id = node_id
         self.hmac_key = hmac_key
@@ -77,10 +79,15 @@ class ArchipelTcpServer:
         self.trust_store = trust_store
         self.port = port
         self._server: Optional[asyncio.AbstractServer] = None
+        self.no_ai = no_ai
 
         # Initialise chunk storage.
         self.chunk_store = ChunkStore(Path(".archipel"))
         self.chunk_store.load_index()
+
+        # Initialise AI and History
+        self.history = MessageHistory(max_size=20)
+        self.ai = GeminiService(api_key=api_key)
 
         # Maps file_id -> local filepath for files we can serve directly.
         self.source_files: dict[str, Path] = {}
@@ -250,7 +257,16 @@ class ArchipelTcpServer:
                     ciphertext = pkt.payload[28:]
                     try:
                         plaintext = decrypt_message(session_key, nonce, ciphertext, tag)
-                        print(f"\n[MSG from {peer_node_id.hex()[:12]}] {plaintext.decode('utf-8')}")
+                        msg_text = plaintext.decode('utf-8')
+                        print(f"\n[MSG from {peer_node_id.hex()[:12]}] {msg_text}")
+                        
+                        # Add to history
+                        self.history.add_message(peer_node_id.hex(), msg_text)
+
+                        # Check for AI trigger
+                        if not self.no_ai and ("/ask" in msg_text or "@archipel-ai" in msg_text):
+                            asyncio.create_task(self._respond_with_ai(writer, session_key, msg_text))
+
                     except ValueError:
                         print(f"[SERVER] Failed to decrypt message from {peer_node_id.hex()[:12]}")
 
@@ -292,6 +308,23 @@ class ArchipelTcpServer:
             except Exception as e:
                 print(f"[SERVER] Packet loop error: {e}")
                 break
+
+    async def _respond_with_ai(self, writer: asyncio.StreamWriter, session_key: bytes, user_query: str):
+        """Query Gemini and send response back to peer."""
+        clean_query = user_query.replace("/ask", "").replace("@archipel-ai", "").strip()
+        print(f"[AI] Processing query: {clean_query}...")
+        
+        context = self.history.get_context_for_ai()
+        response_text = await self.ai.query(clean_query, context)
+        
+        # Add AI response to local history
+        self.history.add_message(self.node_id.hex(), response_text, role="model")
+        
+        # Send back as MSG packet
+        print(f"[AI] Response ready.")
+        nonce, ciphertext, tag = encrypt_message(session_key, response_text.encode("utf-8"))
+        payload = nonce + tag + ciphertext
+        await self._send_packet(writer, PacketType.MSG, payload)
 
     # ----- Chunk data handler -----------------------------------------------
 

@@ -15,8 +15,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="archipel", description="Archipel P2P prototype CLI")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    start = sub.add_parser("start", help="Start local node")
+    start = sub.add_parser("start", help="Start node server")
     start.add_argument("--port", type=int, default=7777)
+    start.add_argument("--api-key", help="Google Gemini API key")
+    start.add_argument("--no-ai", action="store_true", help="Disable AI features")
+
+    sub.add_parser("interactive", help="Start interactive dashboard (Web UI)")
 
     sub.add_parser("peers", help="List known peers")
 
@@ -64,14 +68,34 @@ def main() -> None:
         node_id = pub_path.read_bytes()
         hmac_key = b"archipel-sprint0-dev-key-change-me"
         
-        trust_store = TrustStore(Path(".archipel/trust_store.json"))
+        trust_store = TrustStore(Path("keys/trust.json"))
         trust_store.load()
         
-        server = ArchipelTcpServer(node_id, hmac_key, priv_key, trust_store, args.port)
+        server = ArchipelTcpServer(
+            pub_path.read_bytes(), 
+            b"archipel-sprint0-dev-key-change-me", 
+            SigningKey(priv_path.read_bytes()), 
+            trust_store, 
+            args.port,
+            api_key=args.api_key,
+            no_ai=args.no_ai
+        )
         try:
             asyncio.run(server.start())
         except KeyboardInterrupt:
             print("\n[SERVER] Shutting down.")
+        return
+
+    if args.command == "interactive":
+        from src.ui.dashboard import start_dashboard
+        priv_path = Path("keys/ed25519_private.key")
+        pub_path = Path("keys/ed25519_public.key")
+        if not priv_path.exists():
+            print("Generate keys first: python -m src.cli.main keygen")
+            return
+        
+        # Start the dashboard (blocking)
+        start_dashboard(args)
         return
 
     if args.command == "peers":
