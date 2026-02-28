@@ -37,7 +37,7 @@ from src.transfer.chunk_store import ChunkStore
 from src.transfer.manifest import Manifest
 from src.network.message_history import MessageHistory
 from src.ai.gemini_service import GeminiService
-
+from src.network.discovery import ArchipelDiscovery
 
 class ArchipelTcpServer:
     """Server-side handler for the Archipel TCP protocol.
@@ -93,19 +93,45 @@ class ArchipelTcpServer:
         self.history = MessageHistory(max_size=20)
         self.ai = GeminiService(api_key=api_key)
 
+        # Initialise Discovery
+        self.discovery = ArchipelDiscovery(
+            node_id=self.node_id,
+            tcp_port=self.port,
+            hmac_key=self.hmac_key,
+            peer_table_path=Path(".archipel/peers.json")
+        )
+
         # Maps file_id -> local filepath for files we can serve directly.
         self.source_files: dict[str, Path] = {}
 
     # ----- Lifecycle --------------------------------------------------------
 
     async def start(self):
-        """Start listening for incoming connections (blocking)."""
+        """Start listening and discovery tasks."""
         self._server = await asyncio.start_server(
             self._handle_client, "0.0.0.0", self.port
         )
         print(f"[SERVER] Listening on 0.0.0.0:{self.port}")
-        async with self._server:
+
+        async def _run_discovery(name: str, coro):
+            try:
+                await coro
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                print(f"[DISCOVERY] {name} stopped: {exc}")
+
+        discovery_tasks = [
+            asyncio.create_task(_run_discovery("beacon", self.discovery.run_beacon())),
+            asyncio.create_task(_run_discovery("listener", self.discovery.run_listener())),
+            asyncio.create_task(_run_discovery("cleaner", self.discovery.run_cleaner())),
+        ]
+
+        try:
             await self._server.serve_forever()
+        finally:
+            for task in discovery_tasks:
+                task.cancel()
 
     def register_source_file(self, file_id: str, filepath: Path):
         """Register a local file so we can serve its chunks on request.
