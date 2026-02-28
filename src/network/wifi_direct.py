@@ -1,99 +1,265 @@
 import subprocess
 import string
 import random
-import time
+import sys
+
 
 class WiFiDirectIsland:
-    """Provides a zero-infrastructure Wi-Fi Direct connection mechanism on Windows."""
+    """Provides a zero-infrastructure Wi-Fi Direct connection mechanism on Windows.
     
-    def __init__(self, ssid_prefix="Archipel-Island-", password_length=12):
-        self.ssid = f"DIRECT-{ssid_prefix}{self._generate_random_suffix(4)}"
-        self.password = self._generate_random_suffix(password_length, chars=string.ascii_letters + string.digits)
+    Strategy (ordered by reliability):
+    1. Try legacy Hosted Network (netsh) — works on older drivers.
+    2. Try WinRT Mobile Hotspot using ANY available Wi-Fi adapter profile (not just internet).
+    3. If both fail, offer a guided manual setup via Windows Settings.
+    """
 
-    def _generate_random_suffix(self, length, chars=string.ascii_uppercase + string.digits):
+    DEFAULT_SSID = "Archipel-Island"
+    DEFAULT_PASSWORD_LENGTH = 12
+
+    def __init__(self, ssid=None, password=None):
+        self.ssid = ssid or f"DIRECT-{self.DEFAULT_SSID}-{self._rand(4)}"
+        self.password = password or self._rand(self.DEFAULT_PASSWORD_LENGTH, chars=string.ascii_letters + string.digits)
+
+    @staticmethod
+    def _rand(length, chars=string.ascii_uppercase + string.digits):
         return ''.join(random.choices(chars, k=length))
 
+    # ──────────────────────────────────────────────
+    # Public API
+    # ──────────────────────────────────────────────
     def create_island(self) -> bool:
-        """Starts a WinRT Wi-Fi Direct Group Owner via PowerShell."""
-        ps_script = f"""
-$ErrorActionPreference = "Stop"
+        print(f"[WIFI-ISLAND] Setting up Zero-Internet Wi-Fi Direct Island...")
+        print(f"  SSID: {self.ssid}")
+        print(f"  PASS: {self.password}")
+        print()
 
-# Use the older Hosted Network API which is sometimes disguised as Wi-Fi Direct under the hood on some Win10/11 configs, 
-# or use the modern WFD API. Since pure WFD Group Owner creation via WinRT in PowerShell is highly complex 
-# and often blocked by security policies without a packaged app (Appx), we will use netsh wlan set hostednetwork 
-# but specifically force it without internet sharing.
+        # Strategy 1: Legacy Hosted Network
+        if self._try_hosted_network():
+            return True
 
-# Attempt legacy hosted network first as it's the most reliable "headless" AdHoc method if the driver allows it.
-# If "Hosted network supported: No", this will fail.
-$ssid = "{self.ssid}"
-$key = "{self.password}"
+        # Strategy 2: WinRT Tethering with Wi-Fi adapter enumeration
+        if self._try_winrt_tethering():
+            return True
 
-netsh wlan set hostednetwork mode=allow ssid=$ssid key=$key | Out-Null
-netsh wlan start hostednetwork | Out-Null
+        # Strategy 3: Manual guide
+        self._print_manual_guide()
+        return False
+
+    def check_status(self):
+        """Check the current state of the island network."""
+        # Check hosted network
+        r = self._ps("netsh wlan show hostednetwork")
+        if "actif" in r.lower() or "started" in r.lower():
+            print("[WIFI-ISLAND] Hosted Network island is ACTIVE.")
+            print(r)
+            return
+
+        # Check mobile hotspot
+        r = self._ps(self._tethering_status_script())
+        print(f"[WIFI-ISLAND] Status: {r.strip() if r.strip() else 'Island is offline.'}")
+
+    # ──────────────────────────────────────────────
+    # Strategy 1: Legacy Hosted Network (netsh)
+    # ──────────────────────────────────────────────
+    def _try_hosted_network(self) -> bool:
+        print("[WIFI-ISLAND] Strategy 1: Trying legacy Hosted Network (netsh)...")
+        script = f"""
+$ErrorActionPreference = "Continue"
+$r1 = netsh wlan set hostednetwork mode=allow ssid="{self.ssid}" key="{self.password}" 2>&1
+$r2 = netsh wlan start hostednetwork 2>&1
+if ($LASTEXITCODE -eq 0) {{
+    Write-Output "OK"
+}} else {{
+    Write-Output "FAIL:$r2"
+}}
 """
-        try:
-            print(f"[WIFI-ISLAND] Setting up Zero-Internet Wi-Fi Direct Island...")
-            print(f"  SSID: {self.ssid}")
-            print(f"  PASS: {self.password}")
-            
-            result = subprocess.run(
-                ["powershell", "-Command", ps_script], 
-                capture_output=True, 
-                text=True, 
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
-            
-            if result.returncode == 0:
-                print(f"[WIFI-ISLAND] Island successfully created! Other peers can now join this Wi-Fi network.")
-                return True
-            else:
-                print("[WIFI-ISLAND] Driver rejected Hosted Network. Trying Mobile Hotspot fallback without Internet Sharing...")
-                return self._fallback_mobile_hotspot()
-                
-        except Exception as e:
-            print(f"[WIFI-ISLAND] Error: {e}")
-            return False
+        out = self._ps(script)
+        if "OK" in out:
+            print("[WIFI-ISLAND] Hosted Network island created successfully!")
+            self._print_connect_info()
+            return True
+        print(f"[WIFI-ISLAND]   -> Hosted Network not supported by driver.")
+        return False
 
-    def _fallback_mobile_hotspot(self) -> bool:
-        """Fallback to WinRT TetheringManager if HostedNetwork is strictly blocked by the Intel driver."""
-        ps_script = """
+    # ──────────────────────────────────────────────
+    # Strategy 2: WinRT Tethering (enumerate ALL adapters)
+    # ──────────────────────────────────────────────
+    def _try_winrt_tethering(self) -> bool:
+        print("[WIFI-ISLAND] Strategy 2: Trying WinRT Mobile Hotspot (Wi-Fi adapter enumeration)...")
+        script = """
+$ErrorActionPreference = "Continue"
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+
 [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager,Windows.Networking.NetworkOperators,ContentType=WindowsRuntime] | Out-Null
-$connProfile = [Windows.Networking.Connectivity.NetworkInformation]::GetInternetConnectionProfile()
+[Windows.Networking.Connectivity.NetworkInformation,Windows.Networking.Connectivity,ContentType=WindowsRuntime] | Out-Null
 
-if ($connProfile -eq $null) {
-    # If there is absolutely no network, TetheringManager might fail to initialize.
-    Write-Output "NO_PROFILE"
+# Try internet profile first
+$profile = [Windows.Networking.Connectivity.NetworkInformation]::GetInternetConnectionProfile()
+
+# If no internet profile, enumerate ALL connection profiles and pick the Wi-Fi one
+if ($profile -eq $null) {
+    $allProfiles = [Windows.Networking.Connectivity.NetworkInformation]::GetConnectionProfiles()
+    foreach ($p in $allProfiles) {
+        try {
+            if ($p.IsWlanConnectionProfile) {
+                $profile = $p
+                break
+            }
+        } catch {}
+    }
+}
+
+# If still no profile, try to get the Wi-Fi adapter directly
+if ($profile -eq $null) {
+    try {
+        $adapters = Get-NetAdapter | Where-Object { $_.InterfaceDescription -match "Wi-Fi" -and $_.Status -eq "Up" }
+        if ($adapters) {
+            # Use TetheringManager without a profile (some Windows versions support this)
+            $manager = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager]::CreateFromConnectionProfile(
+                ([Windows.Networking.Connectivity.NetworkInformation]::GetConnectionProfiles() | Select-Object -First 1)
+            )
+        }
+    } catch {}
+}
+
+if ($profile -ne $null) {
+    try {
+        $manager = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager]::CreateFromConnectionProfile($profile)
+    } catch {
+        Write-Output "FAIL:MANAGER_CREATE"
+        exit 1
+    }
+} elseif (-not $manager) {
+    Write-Output "FAIL:NO_ADAPTER"
     exit 1
 }
 
-$manager = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager]::CreateFromConnectionProfile($connProfile)
 if ($manager) {
-    $result = $manager.StartTetheringAsync().GetAwaiter().GetResult()
+    try {
+        $cfg = $manager.GetCurrentAccessPointConfiguration()
+        Write-Output "HOTSPOT_SSID:$($cfg.Ssid)"
+    } catch {}
+    
+    if ($manager.TetheringOperationalState -eq "On") {
+        Write-Output "ALREADY_ON"
+        exit 0
+    }
+    
+    $asyncOp = $manager.StartTetheringAsync()
+    $result = $asyncOp.GetAwaiter().GetResult()
     Write-Output "STATUS:$($result.Status)"
-    if ($result.Status -eq "Success") {
+    if ($result.Status -eq "Success" -or $result.Status -eq 0) {
         exit 0
     }
 }
+Write-Output "FAIL:TETHERING"
 exit 1
 """
-        print("[WIFI-ISLAND] Note: Fallback Mobile Hotspot might require at least a dummy network adapter to be active (like a local loopback or disconnected Wi-Fi).")
-        result = subprocess.run(
-            ["powershell", "-Command", ps_script], 
-            capture_output=True, 
-            text=True, 
-            creationflags=subprocess.CREATE_NO_WINDOW
-        )
-        
-        if result.returncode == 0 and "STATUS:Success" in result.stdout:
-            print("[WIFI-ISLAND] Hotspot fallback created successfully.")
-            return True
-        else:
-            print(f"[WIFI-ISLAND] Failed to create Wi-Fi Island. Your Wi-Fi card (Intel AX203) completely blocks ad-hoc creation without an external router.\nDetails: {result.stdout.strip()}")
-            return False
+        out = self._ps(script)
 
-    def check_status(self):
-        ps_script = """
-netsh wlan show hostednetwork | Select-String -Pattern "Status"
+        if "ALREADY_ON" in out:
+            print("[WIFI-ISLAND] Mobile Hotspot is already active!")
+            self._extract_hotspot_ssid(out)
+            return True
+
+        if "STATUS:Success" in out or "STATUS:0" in out:
+            print("[WIFI-ISLAND] Mobile Hotspot island created successfully!")
+            self._extract_hotspot_ssid(out)
+            return True
+
+        reason = "Unknown"
+        if "NO_ADAPTER" in out:
+            reason = "No Wi-Fi adapter found or all are disconnected"
+        elif "MANAGER_CREATE" in out:
+            reason = "Cannot initialize tethering manager without any network profile"
+        elif "FAIL:TETHERING" in out:
+            reason = "Tethering start failed (possibly need admin rights)"
+        print(f"[WIFI-ISLAND]   -> WinRT Tethering failed: {reason}.")
+        return False
+
+    # ──────────────────────────────────────────────
+    # Strategy 3: Manual guide
+    # ──────────────────────────────────────────────
+    def _print_manual_guide(self):
+        print()
+        print("=" * 70)
+        print("  GUIDE MANUEL - Creer un reseau local sans Internet")
+        print("=" * 70)
+        print()
+        print("  Votre carte Wi-Fi (Intel AX203) bloque la creation")
+        print("  automatique de reseau Ad Hoc. Voici comment le faire")
+        print("  manuellement en 30 secondes :")
+        print()
+        print("  1. Ouvrir Parametres Windows (Win + I)")
+        print("  2. Reseau et Internet -> Point d'acces sans fil mobile")
+        print("  3. Activer le Point d'acces sans fil mobile")
+        print("     (peu importe s'il n'y a pas d'Internet !)")
+        print("  4. Cliquer 'Modifier' pour choisir le SSID et mot de passe")
+        print(f"     Suggestion : SSID = {self.ssid}")
+        print(f"                  Pass = {self.password}")
+        print("  5. L'autre machine se connecte a ce Wi-Fi")
+        print()
+        print("  Apres connexion, trouvez votre IP locale :")
+        print("    > ipconfig")
+        print("    (cherchez l'adaptateur 'Local Area Connection*' ou similaire)")
+        print()
+        print("  Puis lancez Archipel normalement :")
+        print("    > python -m src.cli.main start --port 7777")
+        print()
+        print("=" * 70)
+
+    # ──────────────────────────────────────────────
+    # Helpers
+    # ──────────────────────────────────────────────
+    def _ps(self, script: str) -> str:
+        """Run a PowerShell script and return stdout."""
+        try:
+            r = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", script],
+                capture_output=True, text=True, timeout=15,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            )
+            return r.stdout
+        except subprocess.TimeoutExpired:
+            return "TIMEOUT"
+        except Exception as e:
+            return f"ERROR:{e}"
+
+    def _print_connect_info(self):
+        print()
+        print(f"  Les autres machines peuvent maintenant se connecter :")
+        print(f"    SSID : {self.ssid}")
+        print(f"    PASS : {self.password}")
+        print()
+        print(f"  Puis lancez : python -m src.cli.main start --port 7777")
+        print()
+
+    def _extract_hotspot_ssid(self, output: str):
+        for line in output.splitlines():
+            if line.startswith("HOTSPOT_SSID:"):
+                ssid = line.split(":", 1)[1].strip()
+                if ssid:
+                    print(f"  SSID du Hotspot : {ssid}")
+                    print(f"  (Voir le mot de passe dans Parametres -> Reseau -> Point d'acces)")
+                return
+
+    @staticmethod
+    def _tethering_status_script() -> str:
+        return """
+[Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager,Windows.Networking.NetworkOperators,ContentType=WindowsRuntime] | Out-Null
+[Windows.Networking.Connectivity.NetworkInformation,Windows.Networking.Connectivity,ContentType=WindowsRuntime] | Out-Null
+$profile = [Windows.Networking.Connectivity.NetworkInformation]::GetInternetConnectionProfile()
+if ($profile) {
+    $m = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager]::CreateFromConnectionProfile($profile)
+    Write-Output $m.TetheringOperationalState
+} else {
+    $all = [Windows.Networking.Connectivity.NetworkInformation]::GetConnectionProfiles()
+    foreach ($p in $all) {
+        try {
+            $m = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager]::CreateFromConnectionProfile($p)
+            Write-Output $m.TetheringOperationalState
+            break
+        } catch {}
+    }
+}
 """
-        result = subprocess.run(["powershell", "-Command", ps_script], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
-        print(result.stdout.strip() if result.stdout.strip() else "Island is offline.")
