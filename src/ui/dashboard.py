@@ -99,5 +99,5 @@ def start_dashboard(args):
     t = threading.Thread(target=run_archipel, daemon=True)
     t.start()
     
-    print(f"\n[DASHBOARD] Starting Web UI on http://127.0.0.1:8000")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    print(f"\n[DASHBOARD] Starting Web UI on http://127.0.0.1:{args.ui_port}")
+    uvicorn.run(app, host="127.0.0.1", port=args.ui_port)

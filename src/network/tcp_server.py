@@ -35,6 +35,8 @@ from src.network.constants import PacketType, HEADER_SIZE, HMAC_SIZE, HEADER_FOR
 from src.network.packet import ArchipelPacket
 from src.transfer.chunk_store import ChunkStore
 from src.transfer.manifest import Manifest
+from src.network.message_history import MessageHistory
+from src.ai.gemini_service import GeminiService
 
 
 class ArchipelTcpServer:
@@ -61,6 +63,8 @@ class ArchipelTcpServer:
         priv_key: SigningKey,
         trust_store: TrustStore,
         port: int = 7777,
+        api_key: Optional[str] = None,
+        no_ai: bool = False,
     ):
         """Initialise the server with node credentials and storage.
 

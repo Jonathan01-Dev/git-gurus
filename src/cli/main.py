@@ -20,7 +20,11 @@ def build_parser() -> argparse.ArgumentParser:
     start.add_argument("--api-key", help="Google Gemini API key")
     start.add_argument("--no-ai", action="store_true", help="Disable AI features")
 
-    sub.add_parser("interactive", help="Start interactive dashboard (Web UI)")
+    inter = sub.add_parser("interactive", help="Start interactive dashboard (Web UI)")
+    inter.add_argument("--port", type=int, default=7777, help="TCP port for node server")
+    inter.add_argument("--ui-port", type=int, default=8000, help="HTTP port for Web UI")
+    inter.add_argument("--api-key", help="Google Gemini API key")
+    inter.add_argument("--no-ai", action="store_true", help="Disable AI features")
 
     sub.add_parser("peers", help="List known peers")
 
