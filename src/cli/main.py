@@ -26,9 +26,10 @@ def build_parser() -> argparse.ArgumentParser:
     msg.add_argument("--ip", help="Bypass discovery config by setting IP directly")
     msg.add_argument("--port", type=int, default=7777, help="Bypass discovery config by setting Port directly")
 
-    send = sub.add_parser("send", help="Send file (placeholder)")
-    send.add_argument("node_id")
+    send = sub.add_parser("send", help="Send file to a peer (chunked + encrypted)")
     send.add_argument("filepath")
+    send.add_argument("--ip", required=True, help="Target peer IP")
+    send.add_argument("--port", type=int, default=7777, help="Target peer TCP port")
 
     sub.add_parser("receive", help="List available files (placeholder)")
 
@@ -128,11 +129,46 @@ def main() -> None:
         return
 
     if args.command == "send":
-        print(f"SEND placeholder -> {args.node_id}: {args.filepath}")
+        priv_path = Path("keys/ed25519_private.key")
+        pub_path = Path("keys/ed25519_public.key")
+        if not priv_path.exists() or not pub_path.exists():
+            print("Generate keys first: python -m src.cli.main keygen")
+            return
+
+        priv_key = SigningKey(priv_path.read_bytes())
+        node_id = pub_path.read_bytes()
+        hmac_key = b"archipel-sprint0-dev-key-change-me"
+        filepath = Path(args.filepath)
+
+        async def _send_file():
+            client = ArchipelTcpClient(node_id, hmac_key, priv_key)
+            print(f"Connecting to {args.ip}:{args.port}...")
+            if await client.connect(args.ip, args.port):
+                await client.send_file(filepath)
+                client.close()
+            else:
+                print("Failed to connect.")
+
+        asyncio.run(_send_file())
         return
 
     if args.command == "receive":
-        print("RECEIVE placeholder")
+        from src.transfer.chunk_store import ChunkStore
+        from src.transfer.manifest import Manifest
+        store = ChunkStore(Path(".archipel"))
+        store.load_index()
+        files = store.list_files()
+        if not files:
+            print("No files received yet.")
+            return
+        for fid in files:
+            mj = store.get_manifest_json(fid)
+            if mj:
+                m = Manifest.from_json(mj)
+                available = len(store.get_available_chunks(fid))
+                print(f"  {fid[:16]}... {m.filename} ({m.size} bytes) [{available}/{m.nb_chunks} chunks]")
+            else:
+                print(f"  {fid[:16]}... (no manifest)")
         return
 
     if args.command == "download":
