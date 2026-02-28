@@ -145,10 +145,12 @@ python -m src.cli.main keygen
 - README.md:
 - mise a jour obligatoire a chaque fin de sprint avec l'etat d'avancement
 
-## 12. Etat d'avancement (fin Sprint 3)
+## 12. Etat d'avancement (fin Sprint 4)
 - Discovery UDP/TCP et table de pairs operationnels
 - Chiffrement E2E et handshake implementes (Sprint 2)
 - Wi-Fi Direct: creation d'ile et verifications reseau ajoutees
+- Interface Web Sprint 4 reactivee pour les tests (chat P2P, transfert P2P, onglet Gemini)
+- Service Gemini robuste: fallback multi-modeles + retries/backoff + cache des modeles
 
 ## 13. Validation finale Sprint 4
 - Verification sur machine fraiche:
@@ -166,12 +168,9 @@ python -m src.cli.main keygen
 - ANTI-PATTERN 3: ne jamais reutiliser nonce/cle de session (session ephermere + nonce unique)
 - ANTI-PATTERN 4: ne jamais arriver sans historique de commits GitHub regulier
 
-## 15. Statut Sprint 4 (UI) - code commente/desactive
-- Le code UI Sprint 4 a ete volontairement desactive pour ne pas perturber
-  le coeur stable Sprint 3 (CLI P2P et transfert de fichiers).
-- Les sections Sprint 4 restent dans le repo avec commentaires pour
-  tracabilite, mais le chemin d'execution `interactive` ne demarre plus l'UI.
-- Raison: pendant la phase de stabilisation, les regressions UI ne doivent pas
-  bloquer la demo hors-ligne (messages P2P + transfert de fichiers 50 MB).
-- Strategie retenue pour la demo: CLI d'abord (stable), UI ensuite (reactivation
-  planifiee apres validation complete en environnement propre).
+## 15. Statut Sprint 4 (UI) - finalise
+- Le chemin `interactive` est de nouveau actif pour les tests de l'interface.
+- La demo peut se faire:
+- en mode UI (`interactive`) pour P2P + Gemini
+- ou en mode CLI (`start`, `msg`, `send`) comme plan de secours stable
+- Sprint 4 est clos avec une priorite sur la robustesse de la couche P2P.
