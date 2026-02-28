@@ -20,9 +20,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("peers", help="List known peers")
 
-    msg = sub.add_parser("msg", help="Send encrypted message (placeholder)")
+    msg = sub.add_parser("msg", help="Send encrypted message")
     msg.add_argument("node_id")
     msg.add_argument("message")
+    msg.add_argument("--ip", help="Bypass discovery config by setting IP directly")
+    msg.add_argument("--port", type=int, default=7777, help="Bypass discovery config by setting Port directly")
 
     send = sub.add_parser("send", help="Send file (placeholder)")
     send.add_argument("node_id")
@@ -39,6 +41,9 @@ def build_parser() -> argparse.ArgumentParser:
     trust.add_argument("node_id")
 
     sub.add_parser("keygen", help="Generate Ed25519 node keys")
+
+    net = sub.add_parser("network", help="Manage zero-infrastructure Wi-Fi Direct network")
+    net.add_argument("action", choices=["create-island", "status"], help="Network action")
 
     return parser
 
@@ -98,12 +103,16 @@ def main() -> None:
         peers = table.get_all()
         
         peer_info = peers.get(args.node_id)
-        if not peer_info:
-            print("Unknown peer. Run 'peers' command to discover.")
-            return
-            
-        ip = peer_info.get("ip")
-        port = peer_info.get("tcp_port")
+        
+        if args.ip:
+            ip = args.ip
+            port = args.port
+        else:
+            if not peer_info:
+                print("Unknown peer. Run 'peers' command to discover, or use --ip <address>.")
+                return
+            ip = peer_info.get("ip")
+            port = peer_info.get("tcp_port")
         
         async def _send():
             client = ArchipelTcpClient(node_id, hmac_key, priv_key)
@@ -150,6 +159,16 @@ def main() -> None:
         print(f"Private key: {priv.resolve()}")
         print(f"Public key:  {pub.resolve()}")
         print("Verification: OK")
+        return
+
+    if args.command == "network":
+        from src.network.wifi_direct import WiFiDirectIsland
+        island = WiFiDirectIsland()
+        
+        if args.action == "create-island":
+            island.create_island()
+        elif args.action == "status":
+            island.check_status()
         return
 
     parser.error("unknown command")
