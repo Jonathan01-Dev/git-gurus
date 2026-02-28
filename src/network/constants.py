@@ -15,3 +15,6 @@ class PacketType(IntEnum):
     CHUNK_DATA = 0x05
     MANIFEST = 0x06
     ACK = 0x07
+    HELLO_REPLY = 0x08
+    AUTH = 0x09
+    AUTH_OK = 0x0A
