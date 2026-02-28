@@ -119,7 +119,7 @@ python -m src.cli.main keygen
 - [x] Format de paquet defini (header + payload + HMAC)
 - [x] Schema architecture ajoute dans le README
 - [x] Generation de cles Ed25519 operationnelle (`keygen.py`)
-- [ ] Repository Git initialise et workflow applique (`main`, `develop`, `feature/*`)
+- [x] Repository Git initialise et workflow applique (`main`, `develop`, `feature/*`)
 - [ ] Premier commit tague `sprint-0`
 - [ ] Tous les membres connectes au meme repo (organisation equipe)
 
@@ -131,3 +131,21 @@ python -m src.cli.main keygen
 
 ## 10. Note de mise a jour
 - README ajuste sur la branche `charbel-branche` pour ouvrir une Pull Request de contribution.
+
+## 11. Workflow Git obligatoire
+- Branches:
+- `main`: branche stable
+- `develop`: branche d'integration
+- `feature/xxx`: branche de travail par sprint et par tache
+- Commits:
+- minimum 1 commit toutes les 2 heures par membre actif
+- Issues:
+- chaque tache technique doit avoir une issue GitHub associee
+- les issues servent de journal de progression pour le jury
+- README.md:
+- mise a jour obligatoire a chaque fin de sprint avec l'etat d'avancement
+
+## 12. Etat d'avancement (fin Sprint 3)
+- Discovery UDP/TCP et table de pairs operationnels
+- Chiffrement E2E et handshake implementes (Sprint 2)
+- Wi-Fi Direct: creation d'ile et verifications reseau ajoutees
