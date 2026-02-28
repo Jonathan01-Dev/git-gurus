@@ -102,17 +102,30 @@ async def send_p2p_message(
         return JSONResponse(status_code=400, content={"status": "error", "message": "Empty message"})
 
     try:
-        target_ip, target_port, sender_ref = _resolve_target(node_id=node_id, ip=ip, port=port)
+        target_ip, target_port, _ = _resolve_target(node_id=node_id, ip=ip, port=port)
         local_node_id, priv_key = _local_keys()
         client = ArchipelTcpClient(local_node_id, node_server.hmac_key, priv_key)
         if not await client.connect(target_ip, target_port):
             return {"status": "error", "message": f"Failed to connect to {target_ip}:{target_port}"}
         await client.send_msg(text)
         client.close()
-        node_server.history.add_message(sender_ref, text, role="user")
+        # Save as local outgoing message so UI can display send/receive traces.
+        node_server.history.add_message(node_server.node_id.hex(), text, role="user")
         return {"status": "ok"}
     except Exception as exc:
         return {"status": "error", "message": str(exc)}
+
+
+@app.get("/api/chat/history")
+async def get_chat_history(peer_id: Optional[str] = None, limit: int = 50):
+    if not node_server:
+        return []
+    limit = max(1, min(limit, 500))
+    entries = node_server.history.get_recent(limit=limit)
+    if not peer_id:
+        return entries
+    local_id = node_server.node_id.hex()
+    return [m for m in entries if m["sender_id"] in (local_id, peer_id)]
 
 
 @app.post("/api/files/send")

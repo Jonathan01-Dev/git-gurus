@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentView = 'view-status';
     let activePeerId = null;
     let peersCache = [];
+    let p2pChatPoller = null;
+    let localNodeId = '';
 
     function showToast(message, type = 'ok') {
         const root = document.getElementById('toast-container');
@@ -27,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nodeIdShort.textContent = 'offline';
                 return;
             }
+            localNodeId = data.node_id || '';
             nodeIdShort.textContent = `${data.node_id.substring(0, 12)}...`;
             filesCount.textContent = String(data.files_count);
             peersCount.textContent = String(data.peers_count);
@@ -122,6 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderView(view) {
+        if (view !== 'view-p2p-chat' && p2pChatPoller) {
+            clearInterval(p2pChatPoller);
+            p2pChatPoller = null;
+        }
+
         if (view === 'view-status') {
             dynamicContent.innerHTML = `
                 <div class="glass-card full-width">
@@ -229,6 +237,28 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupP2PChat() {
         const input = document.getElementById('p2p-chat-input');
         const sendBtn = document.getElementById('p2p-chat-send');
+        const messagesEl = document.getElementById('p2p-chat-messages');
+
+        const renderHistory = async () => {
+            const nodeIdField = (document.getElementById('chat-node-id').value || '').trim();
+            const peerId = nodeIdField || activePeerId || '';
+            const params = new URLSearchParams({ limit: '100' });
+            if (peerId) params.set('peer_id', peerId);
+            try {
+                const response = await fetch(`/api/chat/history?${params.toString()}`);
+                const rows = await response.json();
+                if (!Array.isArray(rows)) return;
+
+                messagesEl.innerHTML = '';
+                rows.forEach((m) => {
+                    const sender = m.sender_id || '';
+                    const isLocal = localNodeId && sender === localNodeId;
+                    appendMessage('p2p-chat-messages', m.text || '', isLocal ? 'user' : 'ai');
+                });
+            } catch (error) {
+                // Non-blocking: keep UI responsive even if polling fails once.
+            }
+        };
 
         const send = async () => {
             const text = input.value.trim();
@@ -238,7 +268,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const ip = document.getElementById('chat-ip').value.trim();
             const port = parseInt(document.getElementById('chat-port').value || '7777', 10);
 
-            appendMessage('p2p-chat-messages', text, 'user');
             input.value = '';
 
             const params = new URLSearchParams({ text, port: String(port) });
@@ -249,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch(`/api/chat/send?${params.toString()}`, { method: 'POST' });
                 const data = await response.json();
                 if (response.ok && data.status === 'ok') {
-                    appendMessage('p2p-chat-messages', 'P2P message sent.', 'ai');
+                    await renderHistory();
                 } else {
                     appendMessage('p2p-chat-messages', data.message || 'P2P send failed', 'error');
                 }
@@ -262,6 +291,10 @@ document.addEventListener('DOMContentLoaded', () => {
         input.addEventListener('keypress', (event) => {
             if (event.key === 'Enter') send();
         });
+
+        if (p2pChatPoller) clearInterval(p2pChatPoller);
+        renderHistory();
+        p2pChatPoller = setInterval(renderHistory, 2000);
     }
 
     async function loadReceivedFiles() {

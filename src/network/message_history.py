@@ -49,6 +49,21 @@ class MessageHistory:
             })
         return contents
 
+    def get_recent(self, limit: int = 50) -> List[dict]:
+        """Return recent messages as JSON-serializable dicts."""
+        window = self.history[-limit:] if limit > 0 else self.history
+        out: List[dict] = []
+        for entry in window:
+            out.append(
+                {
+                    "sender_id": entry.sender_id,
+                    "text": entry.text,
+                    "role": entry.role,
+                    "timestamp": entry.timestamp.isoformat(),
+                }
+            )
+        return out
+
     def clear(self):
         """Clear all history."""
         self.history = []
