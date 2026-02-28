@@ -7,6 +7,7 @@ __pycache__/
 .env
 *.key
 keys/
+keys_b/
 
 # Archipel artifacts
 *.archipel
