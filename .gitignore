@@ -22,3 +22,5 @@ htmlcov/
 
 # Local temp files
 tmp/
+.tmp_e2e/
+downloads/

@@ -149,3 +149,19 @@ python -m src.cli.main keygen
 - Discovery UDP/TCP et table de pairs operationnels
 - Chiffrement E2E et handshake implementes (Sprint 2)
 - Wi-Fi Direct: creation d'ile et verifications reseau ajoutees
+
+## 13. Validation finale Sprint 4
+- Verification sur machine fraiche:
+- cloner le repo, installer `requirements.txt`, generer les cles, lancer le noeud
+- valider message P2P et transfert de fichier (50 MB) en mode CLI sans UI
+- README:
+- relu et corrige par tous les membres avant soumission
+- Demo jury:
+- scenario simple: lancement 2 noeuds, message chiffre, transfert 50 MB, verification integrite
+- backup si panne reseau: ajout manuel IP + hotspot local dedie
+
+## 14. Pieges a eviter absolument
+- ANTI-PATTERN 1: ne jamais stocker des cles privees en clair dans le code ou Git
+- ANTI-PATTERN 2: ne jamais implementer un algorithme de chiffrement maison
+- ANTI-PATTERN 3: ne jamais reutiliser nonce/cle de session (session ephermere + nonce unique)
+- ANTI-PATTERN 4: ne jamais arriver sans historique de commits GitHub regulier
