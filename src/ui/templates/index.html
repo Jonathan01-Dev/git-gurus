@@ -1,0 +1,62 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Sprint 4 UI paused: kept in repository for traceability only. -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archipel Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <div class="glass-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>ARCHIPEL</h1>
+                <span class="version">Sprint 4</span>
+            </div>
+            <nav>
+                <ul>
+                    <li class="active"><a href="#" id="view-status">Node Status</a></li>
+                    <li><a href="#" id="view-peers">Peers</a></li>
+                    <li><a href="#" id="view-p2p-chat">P2P Messages</a></li>
+                    <li><a href="#" id="view-p2p-files">P2P Files</a></li>
+                    <li><a href="#" id="view-gemini">Gemini AI</a></li>
+                </ul>
+            </nav>
+            <div class="node-badge" id="node-info">
+                <div class="status-indicator online"></div>
+                <div class="id-text">ID: <span id="node-id-short">Loading...</span></div>
+            </div>
+        </aside>
+
+        <main class="content">
+            <header class="top-bar">
+                <h2 id="page-title">Node Status</h2>
+            </header>
+
+            <section id="main-view" class="main-view">
+                <div class="cards-grid" id="status-cards">
+                    <div class="card glass-card">
+                        <h3>Files Available</h3>
+                        <p class="big-number" id="files-count">0</p>
+                    </div>
+                    <div class="card glass-card">
+                        <h3>Active Peers</h3>
+                        <p class="big-number" id="peers-count">0</p>
+                    </div>
+                    <div class="card glass-card">
+                        <h3>Network Mode</h3>
+                        <p class="big-number">P2P</p>
+                    </div>
+                </div>
+
+                <div id="dynamic-content" class="dynamic-content"></div>
+            </section>
+        </main>
+    </div>
+
+    <div id="toast-container"></div>
+    <script src="/static/app.js"></script>
+</body>
+</html>

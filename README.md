@@ -145,7 +145,32 @@ python -m src.cli.main keygen
 - README.md:
 - mise a jour obligatoire a chaque fin de sprint avec l'etat d'avancement
 
-## 12. Etat d'avancement (fin Sprint 3)
+## 12. Etat d'avancement (fin Sprint 4)
 - Discovery UDP/TCP et table de pairs operationnels
 - Chiffrement E2E et handshake implementes (Sprint 2)
 - Wi-Fi Direct: creation d'ile et verifications reseau ajoutees
+- Interface Web Sprint 4 reactivee pour les tests (chat P2P, transfert P2P, onglet Gemini)
+- Service Gemini robuste: fallback multi-modeles + retries/backoff + cache des modeles
+
+## 13. Validation finale Sprint 4
+- Verification sur machine fraiche:
+- cloner le repo, installer `requirements.txt`, generer les cles, lancer le noeud
+- valider message P2P et transfert de fichier (50 MB) en mode CLI sans UI
+- README:
+- relu et corrige par tous les membres avant soumission
+- Demo jury:
+- scenario simple: lancement 2 noeuds, message chiffre, transfert 50 MB, verification integrite
+- backup si panne reseau: ajout manuel IP + hotspot local dedie
+
+## 14. Pieges a eviter absolument
+- ANTI-PATTERN 1: ne jamais stocker des cles privees en clair dans le code ou Git
+- ANTI-PATTERN 2: ne jamais implementer un algorithme de chiffrement maison
+- ANTI-PATTERN 3: ne jamais reutiliser nonce/cle de session (session ephermere + nonce unique)
+- ANTI-PATTERN 4: ne jamais arriver sans historique de commits GitHub regulier
+
+## 15. Statut Sprint 4 (UI) - finalise
+- Le chemin `interactive` est de nouveau actif pour les tests de l'interface.
+- La demo peut se faire:
+- en mode UI (`interactive`) pour P2P + Gemini
+- ou en mode CLI (`start`, `msg`, `send`) comme plan de secours stable
+- Sprint 4 est clos avec une priorite sur la robustesse de la couche P2P.
