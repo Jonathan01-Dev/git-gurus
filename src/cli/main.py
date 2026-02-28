@@ -20,11 +20,13 @@ def build_parser() -> argparse.ArgumentParser:
     start.add_argument("--api-key", help="Google Gemini API key")
     start.add_argument("--no-ai", action="store_true", help="Disable AI features")
 
-    inter = sub.add_parser("interactive", help="Start interactive dashboard (Web UI)")
+    # Sprint 4 (Web UI) is intentionally disabled for stable Sprint 3 delivery.
+    # The command is kept for traceability but no longer starts the dashboard.
+    inter = sub.add_parser("interactive", help="(disabled) Web UI command kept for history")
     inter.add_argument("--port", type=int, default=7777, help="TCP port for node server")
     inter.add_argument("--ui-port", type=int, default=8000, help="HTTP port for Web UI")
-    inter.add_argument("--api-key", help="Google Gemini API key")
-    inter.add_argument("--no-ai", action="store_true", help="Disable AI features")
+    inter.add_argument("--api-key", help="Google Gemini API key (unused while interactive is disabled)")
+    inter.add_argument("--no-ai", action="store_true", help="Disable AI features (unused while interactive is disabled)")
 
     sub.add_parser("peers", help="List known peers")
 
@@ -91,15 +93,19 @@ def main() -> None:
         return
 
     if args.command == "interactive":
-        from src.ui.dashboard import start_dashboard
-        priv_path = Path("keys/ed25519_private.key")
-        pub_path = Path("keys/ed25519_public.key")
-        if not priv_path.exists():
-            print("Generate keys first: python -m src.cli.main keygen")
-            return
-        
-        # Start the dashboard (blocking)
-        start_dashboard(args)
+        # Sprint 4 UI path intentionally disabled so it does not interfere with
+        # stable Sprint 3 (CLI-only) P2P message/file transfer flows.
+        #
+        # Previous implementation (kept in git history):
+        #   from src.ui.dashboard import start_dashboard
+        #   priv_path = Path("keys/ed25519_private.key")
+        #   pub_path = Path("keys/ed25519_public.key")
+        #   if not priv_path.exists():
+        #       print("Generate keys first: python -m src.cli.main keygen")
+        #       return
+        #   start_dashboard(args)
+        print("Interactive Web UI is disabled for now (Sprint 4 paused).")
+        print("Use CLI mode: python -m src.cli.main start --port 7777 --no-ai")
         return
 
     if args.command == "peers":
