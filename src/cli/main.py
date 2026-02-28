@@ -1,8 +1,14 @@
 ﻿import argparse
+import asyncio
 from pathlib import Path
 
+from nacl.signing import SigningKey
+
 from src.crypto.keys import generate_keypair, verify_keypair
-from src.network.peer_table import PeerTable
+from src.crypto.trust_store import TrustStore
+from src.network.peer_table_sprint1 import PeerTable
+from src.network.tcp_client import ArchipelTcpClient
+from src.network.tcp_server import ArchipelTcpServer
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -42,22 +48,74 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "start":
-        print(f"Node start requested on TCP port {args.port} (skeleton mode)")
+        priv_path = Path("keys/ed25519_private.key")
+        pub_path = Path("keys/ed25519_public.key")
+        if not priv_path.exists() or not pub_path.exists():
+            print("Generate keys first: python -m src.cli.main keygen")
+            return
+        
+        priv_key = SigningKey(priv_path.read_bytes())
+        node_id = pub_path.read_bytes()
+        hmac_key = b"archipel-sprint0-dev-key-change-me"
+        
+        trust_store = TrustStore(Path(".archipel/trust_store.json"))
+        trust_store.load()
+        
+        server = ArchipelTcpServer(node_id, hmac_key, priv_key, trust_store, args.port)
+        try:
+            asyncio.run(server.start())
+        except KeyboardInterrupt:
+            print("\n[SERVER] Shutting down.")
         return
 
     if args.command == "peers":
         table = PeerTable(Path('.archipel/peers.json'))
-        table.load()
-        peers = table.list_peers()
+        table.load_from_disk()
+        peers = table.get_all()
         if not peers:
             print("No peers discovered yet")
             return
-        for p in peers:
-            print(f"{p.node_id_hex} {p.ip}:{p.tcp_port} last_seen={p.last_seen_iso}")
+        for node_id_hex, p in peers.items():
+            ip = p.get("ip", "?")
+            tcp_port = p.get("tcp_port", "?")
+            last_seen = p.get("last_seen", "?")
+            print(f"{node_id_hex} {ip}:{tcp_port} last_seen={last_seen}")
         return
 
     if args.command == "msg":
-        print(f"MSG placeholder -> {args.node_id}: {args.message}")
+        priv_path = Path("keys/ed25519_private.key")
+        pub_path = Path("keys/ed25519_public.key")
+        if not priv_path.exists() or not pub_path.exists():
+            print("Generate keys first: python -m src.cli.main keygen")
+            return
+            
+        priv_key = SigningKey(priv_path.read_bytes())
+        node_id = pub_path.read_bytes()
+        hmac_key = b"archipel-sprint0-dev-key-change-me"
+        
+        table = PeerTable(Path('.archipel/peers.json'))
+        table.load_from_disk()
+        peers = table.get_all()
+        
+        peer_info = peers.get(args.node_id)
+        if not peer_info:
+            print("Unknown peer. Run 'peers' command to discover.")
+            return
+            
+        ip = peer_info.get("ip")
+        port = peer_info.get("tcp_port")
+        
+        async def _send():
+            client = ArchipelTcpClient(node_id, hmac_key, priv_key)
+            print(f"Connecting to {ip}:{port}...")
+            if await client.connect(ip, port):
+                await client.send_msg(args.message)
+                client.close()
+                print("Message sent.")
+            else:
+                print("Failed to send message.")
+                
+        asyncio.run(_send())
         return
 
     if args.command == "send":
@@ -77,7 +135,13 @@ def main() -> None:
         return
 
     if args.command == "trust":
-        print(f"TRUST placeholder -> {args.node_id}")
+        trust_store = TrustStore(Path(".archipel/trust_store.json"))
+        trust_store.load()
+        try:
+            target_id = bytes.fromhex(args.node_id)
+            trust_store.trust_node(target_id)
+        except ValueError:
+            print("Invalid node_id hex format.")
         return
 
     if args.command == "keygen":
